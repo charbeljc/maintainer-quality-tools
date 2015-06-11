@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+import pystache
+import simplejson
+import os, sys
+import git
+from os.path import isdir, join, dirname, exists, abspath
+
+def resource(name):
+    return join(dirname(sys.argv[0]), name)
+
+def getgit(path):
+    while path and not isdir(join(path, '.git')):
+        path = dirname(path)
+    if path:
+        return path
+
+def install_git_hooks():
+    path = getgit(abspath('.'))
+    if not path:
+        raise Error("not in a git tree")
+    if not exists(join(path, ".git/hooks/pre-commit")):
+        os.symlink(resource('git/pre-commit'),
+                join(path, ".git/hooks/pre-commit"))
+    if not exists(join(path, ".git/hooks/cfg")):
+        os.symlink(resource('travis/cfg'),
+                join(path, ".git/hooks/cfg"))
+
+
+def make_readme():
+    if not exists('README.rst'):
+        with open("__openerp__.py") as oerp:
+            template_path = resource('templates/README.rst.mustache')
+            with open(template_path) as template:
+                data = oerp.read()
+                json = eval(data)
+                for k in json:
+                    val = json[k]
+                    if isinstance(val, basestring):
+                        json[k] = val.decode('utf8')
+                rendered = pystache.render(template.read().decode('utf8'), json)
+                with open('README.rst', 'wb') as out:
+                    out.write(rendered.encode('utf8'))
+if __name__ == "__main__":
+    install_git_hooks()
+    make_readme()
